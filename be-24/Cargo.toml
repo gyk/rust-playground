@@ -1,0 +1,9 @@
+[package]
+name = "be-24"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+
+[dependencies]
+byteorder = "1.0"
+rand = "0.3"
+lazy_static = "0.2"
