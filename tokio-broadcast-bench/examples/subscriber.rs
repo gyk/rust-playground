@@ -9,6 +9,8 @@ extern crate tokio_pool;
 
 use std::sync::Mutex;
 use std::net::SocketAddr;
+use std::thread;
+use std::time::Duration;
 use futures::{Stream, Future};
 
 use bytes::BytesMut;
@@ -64,29 +66,32 @@ impl Drop for Inspector {
 fn main() {
     let args: Vec<String> = ::std::env::args().collect();
     let n_threads = args[1].parse::<usize>().unwrap();
-    let n_clients = args[2].parse::<usize>().unwrap();
-    let n_clients_per_thread = (n_clients + n_threads - 1) / n_threads;
+    let n_subscribers = args[2].parse::<usize>().unwrap();
+    let n_subscribers_per_thread = (n_subscribers + n_threads - 1) / n_threads;
 
     let (pool, join) = TokioPool::new(n_threads).expect("Failed to create event loop");
     let addr: SocketAddr = "0.0.0.0:9000".parse().unwrap();
 
-    let mut i_client = 0;
+    let mut i_subscriber = 0;
     'outer: for i in 0..n_threads {
         println!("Starting thread #{}...", i);
         let worker = pool.next_worker();
 
-        for j in 0..n_clients_per_thread {
-            println!("    Spawning subscriber #{} ({}-{})...", i_client, i, j);
+        for j in 0..n_subscribers_per_thread {
+            println!("    Spawning subscriber #{} ({}-{})...", i_subscriber, i, j);
             worker.spawn(move |handle| {
                 TcpStream::connect(&addr, handle)
-                    .and_then(|socket| {
+                    .and_then(move |socket| {
                         let mut inspector = Inspector::default();
                         let mut stat = STATISTICS.lock().unwrap();
                         stat.n_connections += 1;
+                        if stat.n_connections == n_subscribers {
+                            println!("All {} connections established", n_subscribers);
+                        }
 
                         let framed: length_delimited::Framed<_, BytesMut> =
                             length_delimited::Framed::new(socket);
-                        framed.for_each(move |message| {                           
+                        framed.for_each(move |message| {
                             inspector.check(&message);
                             Ok(())
                         })
@@ -95,10 +100,12 @@ fn main() {
                 }
             );
 
-            i_client += 1;
-            if i_client >= n_clients {
+            i_subscriber += 1;
+            if i_subscriber >= n_subscribers {
                 break 'outer;
             }
+
+            thread::sleep(Duration::from_millis(5));
         }
     }
 
