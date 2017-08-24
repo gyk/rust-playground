@@ -2,9 +2,12 @@
 
 extern crate futures;
 extern crate bytes;
+extern crate byteorder;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_timer;
+
+mod codec;
 
 use std::env;
 use std::thread;
@@ -19,8 +22,10 @@ use futures::stream::{self, Stream};
 use futures::sync::mpsc;
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
-use tokio_io::codec::length_delimited;
+use tokio_io::AsyncRead;
 use tokio_timer::Timer;
+
+use codec::LengthPrefixCodec;
 
 fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
     thread::spawn(move || {
@@ -35,8 +40,7 @@ fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
             .map_err(|_io_err| ())
             .take(1)
             .for_each(move |(socket, _addr)| {
-                let framed: length_delimited::Framed<_, BytesMut> =
-                    length_delimited::Framed::new(socket);
+                let framed = socket.framed(LengthPrefixCodec);
 
                 // Clone `tx` because it has to be moved to the inner closure. Since we only take
                 // one of the incoming connections the cloning actually happens once.
@@ -115,8 +119,7 @@ fn main() {
     }));
 
     let done = socket.incoming().for_each(move |(socket, _addr)| {
-        let framed: length_delimited::Framed<_, BytesMut> =
-            length_delimited::Framed::new(socket);
+        let framed = socket.framed(LengthPrefixCodec);
 
         let (to_subscriber, _from_subscriber) = framed.split();
 
