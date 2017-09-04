@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["Yukun Guo <gyk.net@gmail.com>"]
 
 [dependencies]
-byteorder = "1.0"
+byteorder = "1.1"
 rand = "0.3"
 lazy_static = "0.2"

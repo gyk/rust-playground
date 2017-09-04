@@ -8,7 +8,7 @@ extern crate test;
 extern crate rand;
 
 use std::io::{self, Read, Write, Result};
-use byteorder::{ReadBytesExt, WriteBytesExt};
+use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian};
 use std::mem;
 use std::ptr;
 
@@ -178,6 +178,9 @@ pub trait WriteBe24: io::Write {
 }
 
 impl<W: io::Write + ?Sized> WriteBe24 for W {}
+
+// Note: `byteorder` crate now has implementations of 24-bit read/write functions. See corresponding
+// benchmarks below.
 
 #[cfg(test)]
 mod tests {
@@ -356,6 +359,19 @@ mod tests {
         });
     }
 
+    #[bench]
+    fn bench_read_u24_byteorder(b: &mut Bencher) {
+        setup();
+        let buffer = BUFFER.lock().unwrap();
+
+        b.iter(|| {
+            let rd = &mut &buffer[..];
+            for _ in 0..N_NUMBERS {
+                let _ = rd.read_u24::<BigEndian>().unwrap();
+            }
+        });
+    }
+
     // Benchmark of Writing
 
     #[bench]
@@ -427,6 +443,20 @@ mod tests {
             let wr = &mut &mut buffer[..];
             for n in 0..N_NUMBERS {
                 let _ = wr.write_be_u24(numbers[n]).unwrap();
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_write_u24_byteorder(b: &mut Bencher) {
+        setup();
+        let numbers = NUMBERS.lock().unwrap();
+        let mut buffer = BUFFER.lock().unwrap();
+
+        b.iter(|| {
+            let wr = &mut &mut buffer[..];
+            for n in 0..N_NUMBERS {
+                let _ = wr.write_u24::<BigEndian>(numbers[n]).unwrap();
             }
         });
     }
