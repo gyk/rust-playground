@@ -1,0 +1,11 @@
+[package]
+name = "compress"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+
+[[bin]]
+name = "compress"
+
+[dependencies]
+flate2 = { version = "1.0", features = ["zlib"], default-features = false }
+itertools = "0.7"
