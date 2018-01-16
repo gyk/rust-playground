@@ -1,0 +1,9 @@
+[package]
+name = "futures-bounded-mpsc"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+
+[dependencies]
+futures = "0.1"
+tokio-core = "0.1"
+tokio-timer = "0.1"
