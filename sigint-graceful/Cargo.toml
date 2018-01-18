@@ -1,0 +1,10 @@
+[package]
+name = "sigint-graceful"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+
+[dependencies]
+chan = "0.1"
+chan-signal = "0.3"
+crossbeam = "0.2"
+libc = "0.2"
