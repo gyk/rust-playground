@@ -2,7 +2,9 @@ extern crate libc;
 #[macro_use]
 extern crate chan;
 extern crate chan_signal;
-extern crate crossbeam;
+
+use std::thread;
+use std::time::Duration;
 
 use chan_signal::Signal;
 
@@ -34,45 +36,38 @@ fn main() {
         Signal::ALRM, // libc::alarm
     ]);
 
-    let bomb = Bomb::new("main".to_owned());
+    let _bomb = Bomb::new("main".to_owned());
 
-    crossbeam::scope(|scope| {
-        // When our work is complete, send a sentinel value on `sdone`.
-        let (sdone, rdone) = chan::sync(0);
+    // When our work is complete, send a sentinel value on `sdone`.
+    let (sdone, rdone) = chan::sync(0);
 
-        unsafe {
-            libc::alarm(5);
-        }
+    unsafe {
+        libc::alarm(5);
+    }
 
-        // Run work.
-        scope.spawn(move || {
-            let bomb = Bomb::new("run".to_owned());
-            run(sdone)
-        });
-
-        scope.spawn(move || {
-            let bomb = Bomb::new("chan_select".to_owned());
-            loop {
-                // Wait for a signal or for work to be done.
-                chan_select! {
-                    signal.recv() -> signal => {
-                        println!("Received signal: {:?}", signal)
-                    },
-                    rdone.recv() => {
-                        println!("Program completed normally.");
-                        break;
-                    }
-                }
-            }
-        });
+    // Run work.
+    let handler = thread::spawn(move || {
+        let _bomb = Bomb::new("run".to_owned());
+        run(sdone)
     });
+
+    // Wait for a signal or for work to be done.
+    chan_select! {
+        signal.recv() -> signal => {
+            println!("Received signal: {:?}", signal);
+            handler.join().unwrap();
+        },
+        rdone.recv() => {
+            println!("Program completed normally.");
+        }
+    }
 }
 
 fn run(_sdone: chan::Sender<()>) {
     // Do some work.
-    ::std::thread::sleep(std::time::Duration::new(8, 0));
+    thread::sleep(Duration::new(8, 0));
     // Quit normally.
     // Note that we don't need to send any values. We just let the sending channel drop, which
-    // closes the channel, which causes the receiver to synchronize immediately and always.
+    // closes the channel and causes the receiver to synchronize immediately and always.
     println!("Thread exiting!");
 }
