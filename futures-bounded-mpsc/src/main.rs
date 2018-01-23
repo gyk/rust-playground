@@ -17,7 +17,7 @@ fn inpect_channel<T>(tx: &Sender<T>) {
     use std::sync::atomic::Ordering;
 
     let naked_sender = unsafe {
-        mem::transmute::<&Sender<T>, &inspect::Sender<T>>(&tx)
+        mem::transmute::<&Sender<T>, &inspect::Sender<T>>(tx)
     };
     let maybe_parked = naked_sender.maybe_parked;
     let state = naked_sender
