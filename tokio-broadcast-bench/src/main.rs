@@ -36,6 +36,8 @@ fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
         let listener = TcpListener::bind(&addr, &handle).unwrap();
         println!("Listening to publisher on: {}", addr);
 
+        let tx = Rc::new(RefCell::new(Some(tx)));
+
         let done = listener.incoming()
             .map_err(|_io_err| ())
             .take(1)
@@ -44,16 +46,22 @@ fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
 
                 // Clone `tx` because it has to be moved to the inner closure. Since we only take
                 // one of the incoming connections the cloning actually happens once.
-                let tx = tx.clone();
+                let tx_before = Rc::clone(&tx);
                 let (_to_publisher, from_publisher) = framed.split();
 
                 from_publisher
                     .map_err(|_io_err| ())
                     .for_each(move |message| {
-                        tx
-                            .clone()
+                        let tx_after = Rc::clone(&tx_before);
+
+                        tx_before
+                            .borrow_mut()
+                            .take()
+                            .expect("tx has already been taken")
                             .send(message.clone())
-                            .map(|_| ())
+                            .map(move |tx| {
+                                *tx_after.borrow_mut() = Some(tx);
+                            })
                             .map_err(|_| ())
                     })
                     .map(|_| ())
@@ -83,7 +91,11 @@ fn main() {
     let socket = TcpListener::bind(&addr, &handle).unwrap();
     println!("Listening on: {}", addr);
 
-    let subscribers = Rc::new(RefCell::new(Vec::<mpsc::Sender<BytesMut>>::with_capacity(1024)));
+    let subscribers = Rc::new(RefCell::new(
+        Vec::<Rc<RefCell<
+            Option<mpsc::Sender<BytesMut>>
+        >>>::with_capacity(64)
+    ));
     let (main_tx, main_rx) = mpsc::channel(8);
 
     // Sets up the publisher
@@ -109,11 +121,25 @@ fn main() {
         );
     }
 
-    let subscribers2 = subscribers.clone();
+    let subscribers2 = Rc::clone(&subscribers);
     handle.spawn(main_rx.for_each(move |buf: BytesMut| {
         let subscribers = subscribers2.borrow();
         let all_sendings = subscribers.iter().map(|tx| {
-            tx.clone().send(buf.clone())
+            let tx_before = {
+                let tx2 = Rc::clone(tx);
+                let tx_before = tx2
+                    .borrow_mut()
+                    .take()
+                    .expect("tx has already been taken");
+                tx_before
+            };
+            let tx_after = Rc::clone(tx);
+
+            tx_before
+                .send(buf.clone())
+                .map(move |tx| {
+                    *tx_after.borrow_mut() = Some(tx);
+                })
         });
         stream::futures_unordered(all_sendings).then(|_| Ok(())).for_each(|()| Ok(()))
     }));
@@ -124,6 +150,7 @@ fn main() {
         let (to_subscriber, _from_subscriber) = framed.split();
 
         let (tx, rx) = mpsc::channel(4);
+        let tx = Rc::new(RefCell::new(Some(tx)));
         subscribers.borrow_mut().push(tx);
 
         let write_to_subscriber = rx
