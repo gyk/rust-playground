@@ -14,6 +14,8 @@ impl Decoder {
 
         let len = data[0] as usize;
         if len > 10 {
+            // Update: `cargo-fuzz` does be able to detect this bug.
+            // See https://github.com/rust-fuzz/cargo-fuzz/issues/145
             panic!("I bet cargo-fuzz can't detect this.");
         }
         data = &data[1..];
