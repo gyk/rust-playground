@@ -8,24 +8,8 @@ use std::time::Duration;
 
 use chan_signal::Signal;
 
-/// Makes some noise when dropped.
-struct Bomb {
-    label: String,
-}
-
-impl Bomb {
-    fn new(label: String) -> Bomb {
-        Bomb {
-            label
-        }
-    }
-}
-
-impl Drop for Bomb {
-    fn drop(&mut self) {
-        println!("Boom! from {}", self.label);
-    }
-}
+mod bomb;
+use bomb::Bomb;
 
 fn main() {
     // Signal gets a value when the OS sent a INT or TERM signal.

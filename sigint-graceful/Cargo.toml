@@ -7,3 +7,11 @@ authors = ["Yukun Guo <gyk.net@gmail.com>"]
 chan = "0.1"
 chan-signal = "0.3"
 libc = "0.2"
+
+[[bin]]
+name = "graceful"
+path = "src/main.rs"
+
+[[bin]]
+name = "graceful-stdin"
+path = "src/main_stdin.rs"
