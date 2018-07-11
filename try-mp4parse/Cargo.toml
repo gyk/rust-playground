@@ -1,0 +1,12 @@
+[package]
+name = "try-mp4parse"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+
+[[bin]]
+name = "mp4parse"
+path = "src/main.rs"
+
+[dependencies]
+mp4parse = "0.10"
+mp4parse_capi = "0.10"
