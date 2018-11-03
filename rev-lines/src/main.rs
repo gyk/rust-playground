@@ -14,7 +14,7 @@ fn lines_backwards<'a>(text: &'a [u8]) -> impl Iterator<Item = &str> + 'a {
 
 // Usage:
 //
-//     cargo run -- $FILE
+//     cargo run --bin rev-lines -- $FILE
 fn main() -> Result<()> {
     let path = env::args().skip(1).next().expect("Missing $FILE");
     let file = File::open(&path)?;

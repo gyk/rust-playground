@@ -5,3 +5,11 @@ authors = ["Yukun Guo <gyk.net@gmail.com>"]
 
 [dependencies]
 memmap = "0.7"
+
+[[bin]]
+name = "rev-lines"
+path = "src/main.rs"
+
+[[bin]]
+name = "rev-lines-old"
+path = "src/main_old.rs"
