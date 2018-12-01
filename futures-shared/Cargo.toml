@@ -1,0 +1,10 @@
+[package]
+name = "futures-shared"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+
+[[bin]]
+name = "futures-shared"
+
+[dependencies]
+futures = "= 0.1.17"
