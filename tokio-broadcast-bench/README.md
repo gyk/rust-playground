@@ -14,9 +14,6 @@
     cargo run --release -- 1000 200
     ```
 
-    (For unknown reason, this causes high CPU usage when the interval is small. See `tokio-timer`
-    issue [#32](https://github.com/tokio-rs/tokio-timer/issues/32).)
-
 2. Run subscribers (4 threads, 1024 subscribers in total):
     ```bash
     cargo run --release --example subscriber -- 4 1024
@@ -32,14 +29,18 @@
 Here are some (very inaccurate) results when running the release version on a MacBook Pro (CPU: 2.7
 GHz Intel Core i5).
 
-For 1024 clients on 4 threads, bit rate = 800 kbps, list of
-`($packet_size/$sending_interval: $cpu_percentage)` pairs:
+For the setting of 1024 clients on 4 threads with bit rate = 800 kbps, the CPU utilizations are:
 
-- 20KB/200ms: 14%
-- 10KB/100ms: 17%
-- 5KB/50ms: 28%
-- 2KB/20ms: 61%
-- 1KB/10ms: 93%
+| Packet size | Sending interval | CPU (v0.1) | CPU (v0.2) |
+|:-----------:|:----------------:|:----------:|:----------:|
+|     20KB    |       200ms      |     14%    |     17%    |
+|     10KB    |       100ms      |     17%    |     21%    |
+|     5KB     |       50ms       |     28%    |     32%    |
+|     2KB     |       20ms       |     61%    |     58%    |
+|     1KB     |       10ms       |     93%    |     88%    |
+
+- v0.1: old Tokio (`tokio-core` 0.1)
+- v0.2: new Tokio (`tokio` 0.1)
 
 ## Notes on Implementation Details
 
@@ -68,3 +69,7 @@ dropping mechanism on the receiver side of the channel. In this case, the channe
 feature is not mandatory, that is, using an unbounded one is OK. Tokio's official
 [chat](https://github.com/tokio-rs/tokio-core/blob/master/examples/chat.rs) example does use
 `futures::sync::mpsc::unbounded` channel.
+
+## Changelog
+
+Version 0.2.0 upgrades to the new Tokio.

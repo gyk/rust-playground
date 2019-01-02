@@ -1,6 +1,6 @@
 [package]
 name = "tokio-broadcast-bench"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Yukun Guo <gyk.net@gmail.com>"]
 
 [[bin]]
@@ -9,10 +9,10 @@ name = "tokio-broadcast-bench"
 [dependencies]
 log = "0.3"
 futures = "0.1"
-tokio-core = "0.1"
-tokio-io = "0.1.2"
-tokio-pool = "0.1"
-tokio-timer = "0.1"
+tokio = "0.1.13"
+tokio-codec = "0.1"
+tokio-io = "0.1"
+tokio-timer = "0.2"
 bytes = "0.4"
 byteorder = "1.0"
-lazy_static = "0.2"
+lazy_static = "1.0"

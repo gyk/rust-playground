@@ -3,7 +3,8 @@
 extern crate futures;
 extern crate bytes;
 extern crate byteorder;
-extern crate tokio_core;
+extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_io;
 extern crate tokio_timer;
 
@@ -20,20 +21,19 @@ use bytes::BytesMut;
 use futures::{Future, Sink};
 use futures::stream::{self, Stream};
 use futures::sync::mpsc;
-use tokio_core::net::TcpListener;
-use tokio_core::reactor::Core;
-use tokio_io::AsyncRead;
-use tokio_timer::Timer;
+use tokio::net::TcpListener;
+use tokio::runtime::current_thread::Runtime;
+use tokio_codec::Decoder;
+use tokio_timer::Interval;
 
 use codec::LengthPrefixCodec;
 
 fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
     thread::spawn(move || {
         let addr = "0.0.0.0:9090".parse::<SocketAddr>().unwrap();
-        let mut core = Core::new().unwrap();
-        let handle = core.handle();
+        let mut rt = Runtime::new().unwrap();
 
-        let listener = TcpListener::bind(&addr, &handle).unwrap();
+        let listener = TcpListener::bind(&addr).unwrap();
         println!("Listening to publisher on: {}", addr);
 
         let tx = Rc::new(RefCell::new(Some(tx)));
@@ -41,8 +41,8 @@ fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
         let done = listener.incoming()
             .map_err(|_io_err| ())
             .take(1)
-            .for_each(move |(socket, _addr)| {
-                let framed = socket.framed(LengthPrefixCodec);
+            .for_each(move |socket| {
+                let framed = LengthPrefixCodec.framed(socket);
 
                 // Clone `tx` because it has to be moved to the inner closure. Since we only take
                 // one of the incoming connections the cloning actually happens once.
@@ -68,7 +68,7 @@ fn listen_to_publisher(tx: mpsc::Sender<BytesMut>) {
                     .map_err(|_| ())
             });
 
-        core.run(done).unwrap();
+        rt.block_on(done).unwrap();
     });
 }
 
@@ -85,10 +85,10 @@ fn main() {
 
     let addr = "0.0.0.0:9000".parse::<SocketAddr>().unwrap();
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
+    let mut rt = Runtime::new().unwrap();
+    let handle = rt.handle();
 
-    let socket = TcpListener::bind(&addr, &handle).unwrap();
+    let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
     let subscribers = Rc::new(RefCell::new(
@@ -102,15 +102,13 @@ fn main() {
     if use_external_publisher {
         listen_to_publisher(main_tx);
     } else {
-        // FIXME: buggy, may cause high CPU usage at small sending interval.
         let n_bytes_per_packet = args[1].parse::<usize>().unwrap();
         let sending_interval = args[2].parse::<u64>().unwrap();
 
         let payload = BytesMut::from(vec![0; n_bytes_per_packet]);
-        let timer = Timer::default();
-        handle.spawn(timer.interval(Duration::from_millis(sending_interval))
+        rt.spawn(Interval::new_interval(Duration::from_millis(sending_interval))
             .map_err(|_| ())
-            .for_each(move |()| {
+            .for_each(move |_instant| {
                 main_tx
                     .clone()
                     .send(payload.clone())
@@ -122,7 +120,7 @@ fn main() {
     }
 
     let subscribers2 = Rc::clone(&subscribers);
-    handle.spawn(main_rx.for_each(move |buf: BytesMut| {
+    rt.spawn(main_rx.for_each(move |buf: BytesMut| {
         let subscribers = subscribers2.borrow();
         let all_sendings = subscribers.iter().map(|tx| {
             let tx_before = {
@@ -144,8 +142,8 @@ fn main() {
         stream::futures_unordered(all_sendings).then(|_| Ok(())).for_each(|()| Ok(()))
     }));
 
-    let done = socket.incoming().for_each(move |(socket, _addr)| {
-        let framed = socket.framed(LengthPrefixCodec);
+    let done = socket.incoming().for_each(move |socket| {
+        let framed = LengthPrefixCodec.framed(socket);
 
         let (to_subscriber, _from_subscriber) = framed.split();
 
@@ -157,10 +155,10 @@ fn main() {
             .forward(to_subscriber.sink_map_err(|_io_err| ()))
             .map(|_| ())
             .map_err(|_| ());
-        handle.spawn(write_to_subscriber);
+        let _ = handle.spawn(write_to_subscriber);
 
         Ok(())
     });
 
-    core.run(done).unwrap();
+    rt.block_on(done).unwrap();
 }

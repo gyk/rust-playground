@@ -3,9 +3,7 @@ extern crate futures;
 extern crate lazy_static;
 
 extern crate bytes;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate tokio_pool;
+extern crate tokio;
 
 use std::sync::Mutex;
 use std::net::SocketAddr;
@@ -14,9 +12,9 @@ use std::time::Duration;
 use futures::{Stream, Future};
 
 use bytes::BytesMut;
-use tokio_core::net::TcpStream;
-use tokio_io::codec::length_delimited;
-use tokio_pool::TokioPool;
+use tokio::codec::length_delimited::Builder as LengthDelimitedCodecBuilder;
+use tokio::net::TcpStream;
+use tokio::runtime::Builder as RuntimeBuilder;
 
 #[derive(Default)]
 struct Statistics {
@@ -50,12 +48,16 @@ impl Drop for Inspector {
 
         if stat.message_counts.len() == stat.n_connections {
             let total_message_count: usize = stat.message_counts.iter().sum();
+            let max_message_count: &usize = stat.message_counts.iter().max().unwrap_or(&0);
+            let min_message_count: &usize = stat.message_counts.iter().min().unwrap_or(&0);
             let total_byte_count: usize = stat.byte_counts.iter().sum();
 
-            println!("\n# connections = {}, # messages = {}, # bytes = {}\n\
+            println!("\n# connections = {}, # messages = {} (max = {}, min = {}), # bytes = {}\n\
                 # messages per connection = {}, # bytes per message = {}",
                 stat.n_connections,
                 total_message_count,
+                max_message_count,
+                min_message_count,
                 total_byte_count,
                 total_message_count as f32 / stat.n_connections as f32,
                 total_byte_count as f32 / total_message_count as f32);
@@ -69,18 +71,20 @@ fn main() {
     let n_subscribers = args[2].parse::<usize>().unwrap();
     let n_subscribers_per_thread = (n_subscribers + n_threads - 1) / n_threads;
 
-    let (pool, join) = TokioPool::new(n_threads).expect("Failed to create event loop");
+    let mut rt = RuntimeBuilder::new()
+        .core_threads(n_threads)
+        .build()
+        .expect("Failed to create Tokio runtime");
     let addr: SocketAddr = "0.0.0.0:9000".parse().unwrap();
 
     let mut i_subscriber = 0;
     'outer: for i in 0..n_threads {
         println!("Starting thread #{}...", i);
-        let worker = pool.next_worker();
 
         for j in 0..n_subscribers_per_thread {
             println!("    Spawning subscriber #{} ({}-{})...", i_subscriber, i, j);
-            worker.spawn(move |handle| {
-                TcpStream::connect(&addr, handle)
+            rt.spawn(
+                TcpStream::connect(&addr)
                     .and_then(move |socket| {
                         let mut inspector = Inspector::default();
                         let mut stat = STATISTICS.lock().unwrap();
@@ -89,15 +93,15 @@ fn main() {
                             println!("All {} connections established", n_subscribers);
                         }
 
-                        let framed: length_delimited::Framed<_, BytesMut> =
-                            length_delimited::Framed::new(socket);
+                        let framed = LengthDelimitedCodecBuilder::new()
+                            .length_field_length(4)
+                            .new_framed(socket);
                         framed.for_each(move |message| {
                             inspector.check(&message);
                             Ok(())
                         })
                     })
-                    .map_err(|_| ())
-                }
+                    .map_err(move |_| eprintln!("{}-{} connecting error", i, j))
             );
 
             i_subscriber += 1;
@@ -109,5 +113,7 @@ fn main() {
         }
     }
 
-    join.join();
+    rt.shutdown_on_idle()
+      .wait()
+      .unwrap();
 }

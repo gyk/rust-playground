@@ -2,7 +2,7 @@ use std::io::{self, Write, Result};
 
 use bytes::{BytesMut, BufMut};
 use byteorder::{BigEndian, ReadBytesExt};
-use tokio_io::codec::{Encoder, Decoder};
+use tokio_codec::{Encoder, Decoder};
 
 pub struct LengthPrefixCodec;
 
@@ -39,7 +39,7 @@ impl Encoder for LengthPrefixCodec {
     fn encode(&mut self, message: BytesMut, buf: &mut BytesMut) -> Result<()> {
         let payload_len = message.len();
         buf.reserve(payload_len + 4);
-        buf.put_u32::<BigEndian>(payload_len as u32);
+        buf.put_u32_be(payload_len as u32);
         unsafe {
             let mut wr = buf.bytes_mut();
             wr.write_all(&message)?;
