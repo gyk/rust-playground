@@ -1,9 +1,7 @@
 [package]
-name = "tokio-pool"
+name = "tokio-pool-upgrade"
 version = "0.1.0"
-authors = ["Connor Hilarides <connorcpu@live.com>"]
-repository = "https://github.com/Connorcpu/tokio-pool"
-documentation = "https://docs.rs/tokio-pool"
+authors = ["Connor Hilarides <connorcpu@live.com>", "Me"]
 readme = "README.md"
 keywords = ["tokio", "pool", "multithread", "concurrent", "futures"]
 license = "MIT"
@@ -15,7 +13,5 @@ can distribute your load across.
 """
 
 [dependencies]
-tokio-core = "^0.1.1"
-
-[dev-dependencies]
-futures = "^0.1.7"
+futures = "0.1"
+tokio = "0.1"

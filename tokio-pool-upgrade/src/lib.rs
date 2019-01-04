@@ -2,63 +2,25 @@
 //! tokio applications by providing a pool of threads which you
 //! can distribute your load across.
 //!
-//! ## Example
-//!
-//! ```rust
-//! # extern crate futures;
-//! # extern crate tokio_core;
-//! # extern crate tokio_pool;
-//! #
-//! # use tokio_pool::TokioPool;
-//! #
-//! # use futures::Stream;
-//! # use futures::Future;
-//! # use std::net::SocketAddr;
-//! # use std::sync::Arc;
-//! # use tokio_core::net::TcpListener;
-//! #
-//! # fn main() {
-//! // Create a pool with 4 workers
-//! let (pool, join) = TokioPool::new(4)
-//!     .expect("Failed to create event loop");
-//! // Wrap it in an Arc to share it with the listener worker
-//! let pool = Arc::new(pool);
-//! // We can listen on 8080
-//! let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
-//!
-//! // Clone the pool reference for the listener worker
-//! let pool_ref = pool.clone();
-//! // Use the first pool worker to listen for connections
-//! pool.next_worker().spawn(move |handle| {
-//!     // Bind a TCP listener to our address
-//!     let listener = TcpListener::bind(&addr, handle).unwrap();
-//!     // Listen for incoming clients
-//!     listener.incoming().for_each(move |(socket, addr)| {
-//!         pool_ref.next_worker().spawn(move |handle| {
-//!             // Do work with a client socket
-//! #           Ok(())
-//!         });
-//!
-//!         Ok(())
-//!     }).map_err(|_| ()) // You might want to log these errors or something
-//! });
-//!
-//! // You might call `join.join()` here, I don't in this example so that
-//! // `cargo test` doesn't wait forever.
-//! # }
-//! ```
 
-extern crate tokio_core;
+extern crate futures;
+extern crate tokio;
 
 use std::io;
-use std::sync::{Arc, mpsc};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{mpsc, Mutex, MutexGuard};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
-use tokio_core::reactor::{Core, Remote};
+
+use futures::Future;
+use futures::sync::oneshot;
+use tokio::runtime::current_thread::{Handle, Runtime};
+
+// Unlike `tokio_core::reactor::Remote` which is `Sync`, `tokio::runtime::current_thread::Handle` is
+// `!Sync`. Maybe we should use `tokio::runtime::TaskExecutor`?
 
 pub struct TokioPool {
-    remotes: Vec<Remote>,
-    running: Arc<AtomicBool>,
+    stop_tx: Option<oneshot::Sender<()>>,
+    handles: Vec<Mutex<Handle>>,
     next_worker: AtomicUsize,
 }
 
@@ -66,57 +28,62 @@ pub struct PoolJoin {
     joiners: Vec<JoinHandle<()>>,
 }
 
+// FIXME: poor error handling.
+
 impl TokioPool {
-    /// Create a TokioPool with the given number of workers
+    /// Creates a TokioPool with the given number of workers
     pub fn new(worker_count: usize) -> io::Result<(TokioPool, PoolJoin)> {
         assert!(worker_count != 0);
-        let (tx, rx) = mpsc::channel();
-        let running = Arc::new(AtomicBool::new(true));
+        let (tx, rx) = mpsc::channel::<io::Result<Mutex<Handle>>>();
+        let (stop_tx, stop_rx) = oneshot::channel::<()>();
+        let stop_rx_shared = stop_rx.shared();
 
         let mut joiners = Vec::with_capacity(worker_count);
         for _ in 0..worker_count {
             let tx = tx.clone();
-            let running = running.clone();
+            let stop_rx = stop_rx_shared.clone();
 
             let join = thread::spawn(move || {
-                let mut core = match Core::new() {
-                    Ok(core) => core,
+                let mut runtime = match Runtime::new() {
+                    Ok(rt) => rt,
                     Err(err) => {
                         tx.send(Err(err)).expect("Channel was closed early");
                         return;
                     }
                 };
 
-                tx.send(Ok(core.remote())).expect("Channel was closed early");
+                let handle = Mutex::new(runtime.handle());
+                tx.send(Ok(handle)).expect("Channel was closed early");
 
-                while running.load(Ordering::Relaxed) {
-                    core.turn(None);
-                }
+                runtime.block_on(stop_rx).unwrap();
             });
             joiners.push(join);
         }
 
-        let remotes: io::Result<_> = rx.into_iter().take(worker_count).collect();
-        let remotes = remotes?;
+        let handles: io::Result<_> = rx.into_iter()
+                                       .take(worker_count)
+                                       .collect();
 
         let pool = TokioPool {
-            remotes: remotes,
-            running: running,
+            stop_tx: Some(stop_tx),
+            handles: handles?,
             next_worker: AtomicUsize::new(0),
         };
         let join = PoolJoin { joiners: joiners };
         Ok((pool, join))
     }
 
-    pub fn next_worker(&self) -> &Remote {
+    pub fn next_worker(&self) -> MutexGuard<Handle> {
         let next = self.next_worker.fetch_add(1, Ordering::SeqCst);
-        let idx = next % self.remotes.len();
-        &self.remotes[idx]
+        let idx = next % self.handles.len();
+        self.handles[idx].lock().expect("Mutex poisoned")
     }
 
     /// Stops all of the worker threads
-    pub fn stop(&self) {
-        self.running.store(false, Ordering::Relaxed);
+    pub fn stop(&mut self) {
+        if let Some(stop_tx) = self.stop_tx.take() {
+            stop_tx.send(()).expect("Stop signal sending error");
+        }
     }
 }
 
