@@ -1,0 +1,11 @@
+[package]
+name = "tokio-cleanup-queue-2"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.1"
+lazy_static = "1"
+tokio = "0.1"
+tokio-timer = "0.2"
