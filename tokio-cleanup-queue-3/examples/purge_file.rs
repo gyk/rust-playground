@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use log::{debug, info, warn};
 use pretty_env_logger;
-use tokio_cleanup_queue_3::{CleanupQueue, CleanupMessage};
+use tokio_cleanup_queue_3::{CleanupQueue, CleanupTask, StopMessage};
 
 /// A mock file
 #[derive(Debug)]
@@ -21,7 +21,7 @@ const CLEANUP_DELAY: Duration = Duration::from_secs(3);
 const ONE_SECOND: Duration = Duration::from_secs(1);
 
 fn rotate_files(root: &str) {
-    let cleanup_queue = CleanupQueue::new(remove_file, CLEANUP_DELAY);
+    let mut cleanup_queue = CleanupQueue::new(remove_file, CLEANUP_DELAY);
     let sender = cleanup_queue.sender();
 
     let mut file_list = VecDeque::new();
@@ -35,19 +35,19 @@ fn rotate_files(root: &str) {
         while file_list.len() > 5 {
             let old_file = file_list.pop_front().unwrap();
             info!("Sending {:?} to cleanup queue", old_file);
-            sender.unbounded_send(CleanupMessage::new_task(old_file)).unwrap();
+            sender.unbounded_send(CleanupTask::new(old_file)).unwrap();
         }
 
         thread::sleep(ONE_SECOND);
     }
 
-    info!("Sending GracefulStop message to cleanup queue");
-    sender.unbounded_send(CleanupMessage::GracefulStop).unwrap();
+    info!("Sending Graceful Stop message to cleanup queue");
+    cleanup_queue.stop(StopMessage::Graceful);
 
     // Sends remaining files
     while let Some(file) = file_list.pop_front() {
         info!("Sending leftover {:?} to cleanup queue", file);
-        sender.unbounded_send(CleanupMessage::new_task(file)).unwrap();
+        sender.unbounded_send(CleanupTask::new(file)).unwrap();
     }
 }
 
