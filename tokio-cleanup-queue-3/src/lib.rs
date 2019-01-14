@@ -1,5 +1,5 @@
 use std::mem;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::{
@@ -17,11 +17,11 @@ use tokio::runtime::{Runtime, Builder as RuntimeBuilder};
 use tokio_timer::Delay;
 
 lazy_static! {
-    pub static ref CLEANUP_RUNTIME: Arc<Mutex<Runtime>> = Arc::new(Mutex::new(
+    pub static ref CLEANUP_RUNTIME: Arc<Runtime> = Arc::new(
         RuntimeBuilder::new()
             .core_threads(2)
             .build()
-            .expect("Failed to create Tokio runtime for cleanup queue")));
+            .expect("Failed to create Tokio runtime for cleanup queue"));
 }
 
 #[derive(Debug)]
@@ -40,6 +40,7 @@ impl<T> CleanupTask<T> {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum StopMessage {
     Graceful,
@@ -64,6 +65,18 @@ enum QueueState<T> {
     Stopped,
 }
 
+impl<T> QueueState<T> {
+    fn is_running(&self) -> bool {
+        match *self {
+            QueueState::EmptyChannel |
+            QueueState::WaitToExpire { .. } => true,
+
+            QueueState::GracefulStopping |
+            QueueState::Stopped => false,
+        }
+    }
+}
+
 struct CleanupFuture<T, F> {
     state: QueueState<T>,
     cleanup_delay: Duration,
@@ -80,19 +93,21 @@ impl<T, F> Future for CleanupFuture<T, F>
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            // Handles stop message first.
-            match self.stop_rx.poll() {
-                Ok(Async::Ready(StopMessage::Graceful)) => {
-                    let old_state = mem::replace(&mut self.state, QueueState::GracefulStopping);
-                    if let QueueState::WaitToExpire { task, .. } = old_state {
-                        (self.cleanup_fn)(task);
+            if self.state.is_running() {
+                // Handles stop message first.
+                match self.stop_rx.poll() {
+                    Ok(Async::Ready(StopMessage::Graceful)) => {
+                        let old_state = mem::replace(&mut self.state, QueueState::GracefulStopping);
+                        if let QueueState::WaitToExpire { task, .. } = old_state {
+                            (self.cleanup_fn)(task);
+                        }
                     }
+                    Ok(Async::Ready(StopMessage::Force)) => {
+                        self.state = QueueState::Stopped;
+                    }
+                    Ok(Async::NotReady) => (),
+                    Err(..) => break,
                 }
-                Ok(Async::Ready(StopMessage::Force)) => {
-                    self.state = QueueState::Stopped;
-                }
-                Ok(Async::NotReady) => (),
-                Err(..) => break,
             }
 
             self.state = match self.state {
@@ -124,9 +139,7 @@ impl<T, F> Future for CleanupFuture<T, F>
 
                 QueueState::GracefulStopping => {
                     trace!("Graceful stopping...");
-                    while let Some(CleanupTask { task, .. }) =
-                        try_ready!(self.receiver.poll())
-                    {
+                    while let Some(CleanupTask { task, .. }) = try_ready!(self.receiver.poll()) {
                         (self.cleanup_fn)(task);
                     }
 
@@ -138,6 +151,7 @@ impl<T, F> Future for CleanupFuture<T, F>
                 }
             };
         }
+        trace!("CleanupFuture resolved");
         Ok(Async::Ready(()))
     }
 }
@@ -167,7 +181,7 @@ impl<T> CleanupQueue<T>
             stop_rx,
         };
 
-        CLEANUP_RUNTIME.lock().unwrap().spawn(fut);
+        CLEANUP_RUNTIME.executor().spawn(fut);
 
         Self {
             sender,
