@@ -1,0 +1,7 @@
+[package]
+name = "event-callback"
+version = "0.1.0"
+authors = ["Yukun Guo <gyk.net@gmail.com>"]
+edition = "2018"
+
+[dependencies]
