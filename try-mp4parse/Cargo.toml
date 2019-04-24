@@ -5,7 +5,11 @@ authors = ["Yukun Guo <gyk.net@gmail.com>"]
 
 [[bin]]
 name = "mp4parse"
-path = "src/main.rs"
+path = "src/mp4parse.rs"
+
+[[bin]]
+name = "mp4parse-capi"
+path = "src/mp4parse_capi.rs"
 
 [dependencies]
 mp4parse = "0.10"

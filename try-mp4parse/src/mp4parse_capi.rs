@@ -42,7 +42,7 @@ mod naked {
     }
 }
 
-// Issue the command `cargo run movie.mp4` to dump the MP4 file.
+// Issue the command `cargo run --bin mp4parse-capi -- movie.mp4` to dump the MP4 file.
 fn main() {
     let args: Vec<String> = ::std::env::args().collect();
 
