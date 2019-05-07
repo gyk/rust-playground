@@ -8,6 +8,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Fail, Debug)]
 pub enum Error {
+    #[fail(display = "The value is not a JSON map")]
+    NotJsonMapError,
+
+    #[fail(display = "The index/key is invalid for JSON array/object")]
+    JsonInvalidIndexError,
+
     #[fail(display = "{}", _0)]
     AddrParseError(#[fail(cause)] AddrParseError),
 

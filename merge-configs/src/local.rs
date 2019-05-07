@@ -5,6 +5,7 @@ use serde::Deserialize;
 use serde_json::{Value, Map, map::Entry};
 
 use crate::OVERRIDE_ID;
+use crate::value_ext::ValueExt;
 use crate::error::Result;
 
 // FIXME: config-rs does not support keys with dots and JSONPath's `[valid.key.with.dots]` access
@@ -64,15 +65,9 @@ impl Local {
         }
 
         let mut value = self.default_cache()?.clone();
-        match (value.as_object_mut(), self.override_cache()?.as_object()) {
-            (Some(m_dst), Some(m_src)) => {
-                m_dst.extend(
-                    m_src
-                        .get(branch).expect("missing branch")
-                        .as_object().expect("not a JSON map").clone());
-            }
-            _ => panic!(),
-        }
+        let m_dst = value.as_map_mut()?;
+        let m_src = self.override_cache()?.get_value(branch)?.as_map()?;
+        m_dst.extend(m_src.clone());
 
         Ok(value)
     }
@@ -87,7 +82,7 @@ impl Local {
         let cfg = self.inner_config.clone();
         let mut val = cfg.try_into::<Value>()?;
 
-        let m = val.as_object_mut().expect("not a JSON map");
+        let m = val.as_map_mut()?;
         let mut merged = Map::new();
 
         match m.entry(OVERRIDE_ID) {
@@ -97,8 +92,7 @@ impl Local {
             Entry::Occupied(o) => {
                 let domain_m = o
                     .get()
-                    .as_object()
-                    .expect("not a JSON map")
+                    .as_map()?
                     .clone();
 
                 for (domain_k, domain_v) in domain_m {

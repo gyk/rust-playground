@@ -2,6 +2,7 @@
 pub mod local;
 pub mod remote;
 
+mod value_ext;
 mod error;
 
 pub const DEFAULT_ID: &str = "_default_";
