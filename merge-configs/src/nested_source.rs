@@ -3,8 +3,7 @@ use std::collections::hash_map::Entry;
 
 use config::{Value as LibConfigValue, Source, ConfigError};
 
-pub const DEFAULT_ID: &str = "_default_";
-pub const OVERRIDE_ID: &str = "_override_";
+use crate::{DEFAULT_ID, OVERRIDE_ID};
 
 #[derive(Debug)]
 pub struct NestedSource<S: Source> {
@@ -56,39 +55,17 @@ impl<S> Source for NestedSource<S>
 mod tests {
     use super::*;
 
-    use config::{Config as LibConfig, File as LibConfigFile, FileFormat};
+    use std::path::PathBuf;
+
+    use config::{Config as LibConfig, File as LibConfigFile};
 
     use crate::error::Result;
 
     #[test]
     fn smoke_nested_source() -> Result<()> {
-        let source = NestedSource::from_source(
-            LibConfigFile::from_str(
-                r#"{
-                    "server_addr": "127.0.0.1:80",
-                    "site_name": "Joe's server",
-                    "rating": 0,
-
-                    "_override_": {
-                        "itscrap.com": {
-                            "server_addr": "184.168.131.241:80",
-                            "site_name": "IT scrap",
-                            "rating": 5
-                        },
-                        "whorepresents.com": {
-                            "site_name": "Who represents?",
-                            "rating": 95
-                        },
-                        "childrenswear.co.uk": {
-                            "site_name": "Children's wear"
-                        },
-                        "localhost": {
-                            "site_name": "Home"
-                        }
-                    }
-                }"#,
-                FileFormat::Json)
-        );
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("assets/config.json");
+        let source = NestedSource::from_source(LibConfigFile::from(p));
 
         let mut cfg = LibConfig::default();
         cfg.merge(source)?;

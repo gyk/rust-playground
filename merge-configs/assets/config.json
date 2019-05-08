@@ -1,0 +1,23 @@
+{
+    "server_addr": "127.0.0.1:80",
+    "site_name": "Joe's server",
+    "rating": 0,
+
+    "_override_": {
+        "itscrap.com": {
+            "server_addr": "184.168.131.241:80",
+            "site_name": "IT scrap",
+            "rating": 5
+        },
+        "whorepresents.com": {
+            "site_name": "Who represents?",
+            "rating": 95
+        },
+        "childrenswear.co.uk": {
+            "site_name": "Children's wear"
+        },
+        "localhost": {
+            "site_name": "Home"
+        }
+    }
+}

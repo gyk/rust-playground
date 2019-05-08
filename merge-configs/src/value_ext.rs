@@ -9,6 +9,8 @@ pub trait ValueExt {
     fn as_map(&self) -> Result<&Map<String, Value>>;
     /// The mutable version of `as_map`.
     fn as_map_mut(&mut self) -> Result<&mut Map<String, Value>>;
+    /// Moves into inner map.
+    fn into_map(self) -> Result<Map<String, Value>>;
     /// `get` that returns `Result`.
     fn get_value<I: Index>(&self, index: I) -> Result<&Value>;
     /// `get_mut` that returns `Result`.
@@ -24,6 +26,13 @@ impl ValueExt for Value {
     fn as_map_mut(&mut self) -> Result<&mut Map<String, Value>> {
         self.as_object_mut()
             .ok_or_else(|| Error::NotJsonMapError)
+    }
+
+    fn into_map(self) -> Result<Map<String, Value>> {
+        match self {
+            Value::Object(m) => Ok(m),
+            _ => Err(Error::NotJsonMapError),
+        }
     }
 
     fn get_value<I: Index>(&self, index: I) -> Result<&Value> {
