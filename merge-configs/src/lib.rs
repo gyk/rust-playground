@@ -2,6 +2,7 @@
 pub mod local;
 pub mod remote;
 
+mod config;
 mod nested_source;
 mod value_ext;
 mod error;

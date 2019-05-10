@@ -1,4 +1,5 @@
 use std::net::AddrParseError;
+use std::sync::PoisonError;
 
 use config::ConfigError;
 use serde_json::Error as JsonError;
@@ -13,6 +14,9 @@ pub enum Error {
 
     #[fail(display = "The index/key is invalid for JSON array/object")]
     JsonInvalidIndexError,
+
+    #[fail(display = "The lock is poisoned: {}", _0)]
+    PoisonError(String),
 
     #[fail(display = "{}", _0)]
     AddrParseError(#[fail(cause)] AddrParseError),
@@ -37,3 +41,9 @@ macro_rules! impl_from {
 impl_from!(AddrParseError);
 impl_from!(ConfigError);
 impl_from!(JsonError);
+
+impl<T> From<PoisonError<T>> for Error {
+    fn from(e: PoisonError<T>) -> Self {
+        Error::PoisonError(format!("{}", e))
+    }
+}

@@ -57,16 +57,9 @@ impl Local {
     }
 
     // FIXME: currently `key` cannot contain dots
-    pub fn get_override(&mut self, branch: &str, key: Option<&str>) -> Result<Value> {
-        let concat_key;
-        let override_key: &str = match key {
-            Some(key) => {
-                concat_key = format!("{}.{}", branch, key);
-                &concat_key
-            }
-            None => branch,
-        };
-        Ok(self.inner_config.get(override_key)?)
+    pub fn get_override(&mut self, branch: &str, key: &str) -> Result<Value> {
+        let override_key = format!("{}.{}", branch, key);
+        Ok(self.inner_config.get(&override_key)?)
     }
 
     pub fn default_cache(&mut self) -> Result<&Value> {
@@ -85,6 +78,15 @@ impl Local {
         Ok(self.override_cache.as_ref().unwrap())
     }
 
+    pub fn override_cache_branch(&mut self, branch: &str) -> Result<&Value> {
+        if self.override_cache.is_none() {
+            self.update_caches()?;
+        }
+
+        let override_map = self.override_cache.as_ref().unwrap();
+        override_map.get_value(branch)
+    }
+
     // FIXME: currently `branch` cannot contain dots
     pub fn fetch_merged(&mut self, branch: &str) -> Result<Value> {
         if self.default_cache.is_none() || self.override_cache.is_none() {
@@ -101,13 +103,19 @@ impl Local {
 
     // WORKAROUND: supports `branch` with dots
     pub fn fetch_merged2(&mut self, branch: &str) -> Result<Value> {
+
+        // Helper
+        fn get_override_branch(this: &mut Local, branch: &str) -> Result<Value> {
+            Ok(this.inner_config.get(branch)?)
+        }
+
         if self.default_cache.is_none() || self.override_cache.is_none() {
             self.update_caches()?;
         }
 
         let mut value = self.default_cache()?.clone();
         let m_dst = value.as_map_mut()?;
-        let v_src = self.get_override(branch, None)?;
+        let v_src = get_override_branch(self, branch)?;
         let m_src = v_src.as_map()?;
         m_dst.extend(m_src.clone());
 
