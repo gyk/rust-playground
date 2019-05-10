@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 
 use config::{Value as LibConfigValue, Source, ConfigError};
 
@@ -29,25 +28,13 @@ impl<S> Source for NestedSource<S>
 
     fn collect(&self) -> Result<HashMap<String, LibConfigValue>, ConfigError> {
         let mut original_map = self.inner_source.collect()?;
-        let mut m = HashMap::with_capacity(original_map.len());
+        let mut override_map = original_map
+            .remove(OVERRIDE_ID)
+            .and_then(|m| m.into_table().ok())
+            .unwrap_or_else(|| HashMap::with_capacity(1));
 
-        match original_map.entry(OVERRIDE_ID.to_owned()) {
-            Entry::Vacant(..) => {
-                // The override part is absent
-            }
-            Entry::Occupied(o) => {
-                let over_m = o
-                    .remove()
-                    .into_table()?;
-
-                for (over_k, over_v) in over_m {
-                    m.insert(over_k, over_v);
-                }
-            }
-        };
-
-        m.insert(DEFAULT_ID.to_owned(), LibConfigValue::from(original_map));
-        Ok(m)
+        override_map.insert(DEFAULT_ID.to_owned(), LibConfigValue::from(original_map));
+        Ok(override_map)
     }
 }
 
