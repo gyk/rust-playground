@@ -4,7 +4,7 @@ pub use config::{Config as LibConfig, Value as LibConfigValue, Source};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::DEFAULT_ID;
+use crate::{DEFAULT_ID, OVERRIDE_ID};
 use crate::nested_source::NestedSource;
 use crate::value_ext::ValueExt;
 use crate::error::Result;
@@ -15,16 +15,14 @@ use crate::error::Result;
 #[derive(Debug)]
 pub struct Local {
     inner_config: LibConfig,
-    default_cache: Option<Value>,
-    override_cache: Option<Value>,
+    cache: Option<Value>,
 }
 
 impl Local {
     pub fn new() -> Self {
         Self {
             inner_config: LibConfig::new(),
-            default_cache: None,
-            override_cache: None,
+            cache: None,
         }
     }
 
@@ -39,102 +37,91 @@ impl Local {
     }
 
     // FIXME: currently `key` cannot contain dots
-    pub fn set_default(&mut self, key: &str, value: Value) -> Result<()> {
-        let cfg_value = LibConfigValue::deserialize(value)?;
-        let default_key = format!("{}.{}", DEFAULT_ID, key);
-        self.inner_config.set(&default_key, cfg_value)?;
-        self.reset_caches();
-        Ok(())
+    pub fn set_default_by(&mut self, key: &str, value: Value) -> Result<()> {
+        self.set_override_by(DEFAULT_ID, key, value)
     }
 
     // FIXME: currently `key` cannot contain dots
-    pub fn set_override(&mut self, branch: &str, key: &str, value: Value) -> Result<()> {
+    pub fn set_override_by(&mut self, branch: &str, key: &str, value: Value) -> Result<()> {
         let cfg_value = LibConfigValue::deserialize(value)?;
         let override_key = format!("{}.{}", branch, key);
         self.inner_config.set(&override_key, cfg_value)?;
-        self.reset_caches();
+        self.reset_cache();
         Ok(())
     }
 
     // FIXME: currently `key` cannot contain dots
-    pub fn get_override(&mut self, branch: &str, key: &str) -> Result<Value> {
+    pub fn get_default_by(&mut self, key: &str) -> Result<Value> {
+        self.get_branch_by(DEFAULT_ID, key)
+    }
+
+    // FIXME: currently `key` cannot contain dots
+    pub fn get_branch_by(&mut self, branch: &str, key: &str) -> Result<Value> {
         let override_key = format!("{}.{}", branch, key);
         Ok(self.inner_config.get(&override_key)?)
     }
 
-    pub fn default_cache(&mut self) -> Result<&Value> {
-        if self.default_cache.is_none() {
-            self.update_caches()?;
+    pub fn get_default(&mut self) -> Result<Value> {
+        self.get_branch(DEFAULT_ID)
+    }
+
+    pub fn get_branch(&mut self, branch: &str) -> Result<Value> {
+        Ok(self.inner_config.get(&branch)?)
+    }
+
+    pub fn cache(&mut self) -> Result<&Value> {
+        if self.cache.is_none() {
+            self.update_cache()?;
         }
 
-        Ok(self.default_cache.as_ref().unwrap())
+        Ok(self.cache.as_ref().unwrap())
+    }
+
+    pub fn default_cache(&mut self) -> Result<&Value> {
+        let cache = self.cache()?;
+        cache.get_value(DEFAULT_ID)
     }
 
     pub fn override_cache(&mut self) -> Result<&Value> {
-        if self.override_cache.is_none() {
-            self.update_caches()?;
-        }
-
-        Ok(self.override_cache.as_ref().unwrap())
-    }
-
-    pub fn override_cache_branch(&mut self, branch: &str) -> Result<&Value> {
-        if self.override_cache.is_none() {
-            self.update_caches()?;
-        }
-
-        let override_map = self.override_cache.as_ref().unwrap();
-        override_map.get_value(branch)
+        let cache = self.cache()?;
+        cache.get_value(OVERRIDE_ID)
     }
 
     // FIXME: currently `branch` cannot contain dots
-    pub fn fetch_merged(&mut self, branch: &str) -> Result<Value> {
-        if self.default_cache.is_none() || self.override_cache.is_none() {
-            self.update_caches()?;
+    pub fn get_merged(&mut self, branch: &str) -> Result<Value> {
+        if self.cache.is_none() {
+            self.update_cache()?;
         }
 
-        let mut value = self.default_cache()?.clone();
+        let mut value = self.cache()?.clone();
         let m_dst = value.as_map_mut()?;
-        let m_src = self.override_cache()?.get_value(branch)?.as_map()?;
+        let m_src = self.cache()?.get_value(branch)?.as_map()?;
         m_dst.extend(m_src.clone());
 
         Ok(value)
     }
 
     // WORKAROUND: supports `branch` with dots
-    pub fn fetch_merged2(&mut self, branch: &str) -> Result<Value> {
-
-        // Helper
-        fn get_override_branch(this: &mut Local, branch: &str) -> Result<Value> {
-            Ok(this.inner_config.get(branch)?)
-        }
-
-        if self.default_cache.is_none() || self.override_cache.is_none() {
-            self.update_caches()?;
-        }
-
+    pub fn get_merged2(&mut self, branch: &str) -> Result<Value> {
         let mut value = self.default_cache()?.clone();
         let m_dst = value.as_map_mut()?;
-        let v_src = get_override_branch(self, branch)?;
+        let v_src = self.get_branch(branch)?;
         let m_src = v_src.as_map()?;
         m_dst.extend(m_src.clone());
 
         Ok(value)
     }
 
-    fn reset_caches(&mut self) {
-        self.default_cache = None;
-        self.override_cache = None;
+    #[inline]
+    fn reset_cache(&mut self) {
+        self.cache = None;
     }
 
-    fn update_caches(&mut self) -> Result<()> {
+    fn update_cache(&mut self) -> Result<()> {
         self.inner_config.refresh()?;
         let cfg = self.inner_config.clone();
-        let mut val = cfg.try_into::<Value>()?;
-
-        let m = val.as_map_mut()?;
-        self.default_cache = m.remove(DEFAULT_ID);
-        self.override_cache = Some(val);
+        let val = cfg.try_into::<Value>()?;
+        self.cache = Some(val);
         Ok(())
     }
 }
@@ -163,26 +150,26 @@ mod tests {
         p.push("assets/config.json");
         let source = LibConfigFile::from(p);
 
-        // FIXME: use `fetch_merged` instead of `fetch_merged2` when config-rs is fixed.
+        // FIXME: use `get_merged` instead of `get_merged2` when config-rs is fixed.
 
         let mut local = Local::new();
         local.merge(source)?;
         println!("Local = {:#?}", local);
-        println!("Local.default = {:#?}", local.default_cache()?);
-        println!("Local.override = {:#?}", local.override_cache()?);
-        let default_settings = Settings::deserialize(local.default_cache()?.clone())?;
-        let merged_settings = Settings::deserialize(local.fetch_merged2(r"whorepresents.com")?)?;
+        println!("Local.cache = {:#?}", local.cache()?);
+        let default_settings = Settings::deserialize(local.get_default()?)?;
+        let merged_settings = Settings::deserialize(local.get_merged2(r"whorepresents.com")?)?;
         println!("Local.default = {:#?}", default_settings);
         println!("Local.merged = {:#?}", merged_settings);
 
         // modifies config
-        local.set_default("server_addr", "192.168.1.1:80".into())?;
-        local.set_override(r"whorepresents.com", "site_name", "Whore presents".into())?;
-        local.set_override("whorepresents.com", "rating", 1024.into())?;
+        local.set_default_by("server_addr", "192.168.1.1:80".into())?;
+        local.set_override_by(r"whorepresents.com", "site_name", "Whore presents".into())?;
+        local.set_override_by("whorepresents.com", "rating", 1024.into())?;
 
         println!("\n================================\nAfter modification:\n");
+        // Here deliberately uses `default_cache` rather than `get_default`.
         let default_settings = Settings::deserialize(local.default_cache()?.clone())?;
-        let merged_settings = Settings::deserialize(local.fetch_merged2("whorepresents.com")?)?;
+        let merged_settings = Settings::deserialize(local.get_merged2("whorepresents.com")?)?;
         println!("Local.default = {:#?}", default_settings);
         println!("Local.merged = {:#?}", merged_settings);
 
