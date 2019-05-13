@@ -9,6 +9,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Fail, Debug)]
 pub enum Error {
+    #[fail(display = "Internal error: {}", _0)]
+    InternalError(String),
+
     #[fail(display = "{}", _0)]
     AddrParseError(#[fail(cause)] AddrParseError),
 
