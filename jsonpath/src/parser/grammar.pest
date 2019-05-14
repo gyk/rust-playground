@@ -1,0 +1,28 @@
+separator =  _{ "." }
+special_chars = _{ "_" | "-" | "/" | "\\" }
+
+single_quote = _{ "'" }
+double_quote = _{ "\"" }
+
+ident = { (ASCII_ALPHA | special_chars) ~ (ASCII_ALPHA | ASCII_DIGIT | special_chars)* }
+ident_in_single_quotes = { (ASCII_ALPHA | ASCII_DIGIT | special_chars | separator | double_quote)+ }
+ident_in_double_quotes = { (ASCII_ALPHA | ASCII_DIGIT | special_chars | separator | single_quote)+ }
+number = { ("+" | "-")? ~ ASCII_DIGIT+ }
+
+child = { separator ~ ident }
+first_child = { ident }
+indexed_child = { "[" ~ number ~ "]" }
+sub_child = { "[" ~ ident ~ "]" }
+single_quoted_child = { "[" ~ single_quote ~ ident_in_single_quotes ~ single_quote ~ "]" }
+double_quoted_child = { "[" ~ double_quote ~ ident_in_double_quotes ~ double_quote ~ "]" }
+
+// NOTE: `indexed_child` should be given before `sub_child`.
+first = _{ (first_child | indexed_child | sub_child | single_quoted_child | double_quoted_child) }
+next = _{ (child | indexed_child | sub_child | single_quoted_child | double_quoted_child) }
+
+expression = {
+    SOI ~
+    first ~
+    next* ~
+    EOI
+}
