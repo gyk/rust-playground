@@ -1,11 +1,15 @@
 #[macro_use]
 extern crate pest_derive;
 
+use std::mem;
+
 use serde_json::Value;
 
 mod parser;
+pub mod error;
 
 use crate::parser::parse;
+use crate::error::Result;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PathItem {
@@ -18,10 +22,10 @@ pub struct Selector {
 }
 
 impl Selector {
-    pub fn new(expression: &str) -> Self {
-        Self {
-            json_path: parse(expression),
-        }
+    pub fn new(expression: &str) -> Result<Self> {
+        Ok(Self {
+            json_path: parse(expression)?,
+        })
     }
 
     pub fn get<'a>(&self, value: &'a Value) -> Option<&'a Value> {
@@ -74,14 +78,13 @@ impl Selector {
         curr
     }
 
-    // FIXME: returns `Result<()>`
-    pub fn set(&self, key: &mut Value, value: Value) {
-        if let Some(p) = self.get_mut(key) {
-            *p = value;
-        }
+    pub fn set(&self, key: &mut Value, value: Value) -> Option<Value> {
+        self.get_mut(key)
+            .map(|p| mem::replace(p, value))
     }
 }
 
+// We can't write `impl<T> SliceIndex<[T]> for isize`.
 fn signed_get<T>(arr: &[T], index: isize) -> Option<&T> {
     match signed_index(index, arr.len()) {
         Some(i) => arr.get(i),
@@ -116,7 +119,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn selector() {
+    fn selector() -> Result<()> {
         let data = json!({
             "foo": {
                 "bar": 42,
@@ -125,13 +128,15 @@ mod tests {
             "qux": null
         });
 
-        let selector = Selector::new("foo.bar");
+        let selector = Selector::new("foo.bar")?;
         assert_eq!(selector.get(&data), Some(&Value::Number(42.into())));
 
         let mut data = data;
-        let selector = Selector::new("foo.baz");
+        let selector = Selector::new("foo.baz")?;
         let value = Value::String("World".into());
-        selector.set(&mut data, value.clone());
+        assert_eq!(selector.set(&mut data, value.clone()), Some(Value::String("Hello".into())));
         assert_eq!(selector.get(&data), Some(&value));
+
+        Ok(())
     }
 }
