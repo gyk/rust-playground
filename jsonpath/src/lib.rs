@@ -78,9 +78,9 @@ impl Selector {
         curr
     }
 
-    pub fn set(&self, key: &mut Value, value: Value) -> Option<Value> {
-        self.get_mut(key)
-            .map(|p| mem::replace(p, value))
+    pub fn set(&self, value: &mut Value, new_value: Value) -> Option<Value> {
+        self.get_mut(value)
+            .map(|p| mem::replace(p, new_value))
     }
 }
 
