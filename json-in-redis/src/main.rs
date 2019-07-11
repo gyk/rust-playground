@@ -1,18 +1,16 @@
 //! Stores JSON data into Redis
 
 // The experimental native async/await support
-#![feature(await_macro, async_await)]
+#![feature(async_await)]
 
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use futures::compat::Future01CompatExt;
 use redis_async::client::{self, PairedConnection};
 use redis_async::resp_array;
 use serde_json::{self, json, Value};
-
-// async/await
-use tokio::await;
 
 mod error;
 
@@ -22,25 +20,25 @@ async fn async_put_json<'a>(conn: &'a Arc<PairedConnection>, key: &'a str, value
     -> Result<()>
 {
     let value_str = value.to_string();
-    let _ret = await!(conn.send::<String>(resp_array!["SET", key, value_str]))?;
+    let _ret = conn.send::<String>(resp_array!["SET", key, value_str]).compat().await?;
     println!("async_put_json");
     Ok(())
 }
 
 async fn async_check_key<'a>(conn: &'a Arc<PairedConnection>, key: &'a str) -> Result<bool> {
-    let key_exist = await!(conn.send(resp_array!["EXISTS", key]))?;
+    let key_exist = conn.send(resp_array!["EXISTS", key]).compat().await?;
     println!("async_check_key");
     Ok(key_exist)
 }
 
 async fn async_fetch_json<'a>(conn: &'a Arc<PairedConnection>, key: &'a str) -> Result<Value> {
-    let ret: String = await!(conn.send(resp_array!["GET", key]))?;
+    let ret: String = conn.send(resp_array!["GET", key]).compat().await?;
     println!("async_fetch_json");
     Ok(serde_json::from_str(&ret)?)
 }
 
 async fn run_client(addr: SocketAddr) -> Result<()> {
-    let conn = Arc::new(await!(client::paired_connect(&addr))?);
+    let conn = Arc::new(client::paired_connect(&addr).compat().await?);
 
     let input_value = json!({
         "code": 200,
@@ -55,14 +53,14 @@ async fn run_client(addr: SocketAddr) -> Result<()> {
 
     const KEY: &str = "foo";
 
-    await!(async_put_json(&conn, KEY, &input_value))?;
+    async_put_json(&conn, KEY, &input_value).await?;
 
-    let key_exists = await!(async_check_key(&conn, KEY))?;
+    let key_exists = async_check_key(&conn, KEY).await?;
     if !key_exists {
         return Err(Error::InternalError("The key does NOT exist.".to_owned()));
     }
 
-    let output_value = await!(async_fetch_json(&conn, KEY))?;
+    let output_value = async_fetch_json(&conn, KEY).await?;
     println!("{:?}", output_value);
     assert_eq!(input_value, output_value, "The output JSON is not the same as the input one");
 
@@ -75,8 +73,8 @@ fn main() -> error::Result<()> {
         .unwrap_or_else(|| "127.0.0.1:6379".to_string())
         .parse()?;
 
-    tokio::run_async(async move {
-        await!(run_client(addr)).expect("run_client error")
+    tokio::run(async move {
+        run_client(addr).await.expect("run_client error")
     });
 
     Ok(())
