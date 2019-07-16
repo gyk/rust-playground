@@ -96,6 +96,7 @@ impl Local {
         let mut value = self.cache()?.clone();
         let m_dst = value.as_map_mut()?;
         let m_src = self.cache()?.get_value(branch)?.as_map()?;
+        // FIXME: wrong implementation. It cannot handle nested maps.
         m_dst.extend(m_src.clone());
 
         Ok(value)
@@ -107,6 +108,7 @@ impl Local {
         let m_dst = value.as_map_mut()?;
         let v_src = self.get_branch(branch)?;
         let m_src = v_src.as_map()?;
+        // FIXME: wrong implementation. It cannot handle nested maps.
         m_dst.extend(m_src.clone());
 
         Ok(value)
