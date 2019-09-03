@@ -64,6 +64,21 @@ mod tests {
             ][..]
         );
 
+        assert_eq!(
+            parse("singleton")?,
+            &[
+                Child("singleton".into()),
+            ][..]
+        );
+
+        let special_characters = r"a/b_c\d";
+        assert_eq!(
+            parse(special_characters)?,
+            &[
+                Child(special_characters.into()),
+            ][..]
+        );
+
         // leading brackets, negative index, index with explicit '+' sign
         assert_eq!(
             parse("[foo].-bar[--baz][+42][-1][-][-100u]")?,

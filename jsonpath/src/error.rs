@@ -17,6 +17,18 @@ pub enum Error {
 
     #[fail(display = "{}", _0)]
     PestError(#[fail(cause)] PestError<Rule>),
+
+    #[fail(display = "The value is not a JSON map")]
+    NotJsonMapError,
+
+    #[fail(display = "The value is not a JSON array")]
+    NotJsonArrayError,
+
+    #[fail(display = "The key '{}' is invalid for JSON object", _0)]
+    JsonInvalidKeyError(String),
+
+    #[fail(display = "The index '{}' is invalid for JSON array", _0)]
+    JsonInvalidArrayIndexError(isize),
 }
 
 macro_rules! impl_from {
