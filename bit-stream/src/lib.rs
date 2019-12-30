@@ -13,32 +13,27 @@ pub use bitstream::*;
 pub use bytestream::*;
 
 #[derive(Clone, Debug)]
-pub struct BStream<'a> {
+pub struct BitSlice<'a> {
     data: Cow<'a, [u8]>,
     start_bit: usize,
     end_bit: usize,
-
-    // FIXME: Manipulating linked list is tricky, just use `Vec`.
-    /// The chained `BStream`.
-    pub next: Option<Box<BStream<'a>>>,
 }
 
-impl<'a> BStream<'a> {
+impl<'a> BitSlice<'a> {
     pub fn new<T>(data: T, start_bit: usize, bit_len: Option<usize>) -> Self
         where Cow<'a, [u8]>: From<T>
     {
         let data = Cow::from(data);
         let end_bit = Self::get_end_bit(&data, start_bit, bit_len).expect("invalid arguments");
 
-        BStream {
+        BitSlice {
             data,
             start_bit,
             end_bit,
-            next: None,
         }
     }
 
-    /// Initializes a `BStream` by taking the `[start_bit, end_bit)` bits from `data: &[u8]`.
+    /// Initializes a `BitSlice` by taking the `[start_bit, end_bit)` bits from `data: &[u8]`.
     pub fn from_slice_owned(data: &[u8], start_bit: usize, end_bit: usize) -> Self {
         let skip_start_len = start_bit / 8;
         let skip_end_len = (data.len() * 8 - end_bit) / 8;
@@ -46,7 +41,6 @@ impl<'a> BStream<'a> {
             data: Cow::from((&data[skip_start_len .. (data.len() - skip_end_len)]).to_vec()),
             start_bit: start_bit - skip_start_len * 8,
             end_bit: end_bit - skip_end_len * 8,
-            next: None,
         }
     }
 
@@ -55,7 +49,6 @@ impl<'a> BStream<'a> {
             data: Cow::from(vec![pb.value]),
             start_bit: 0,
             end_bit: pb.bit_len() as usize,
-            next: None,
         }
     }
 
@@ -80,29 +73,7 @@ impl<'a> BStream<'a> {
     }
 
     pub fn bit_len(&self) -> usize {
-        let mut bs = self;
-        let mut l = 0;
-        loop {
-            l += bs.end_bit - bs.start_bit;
-            bs = match bs.next {
-                Some(ref next_bs) => next_bs,
-                None => return l,
-            };
-        }
-    }
-
-    /// Appends a new `BStream` to the current one.
-    ///
-    /// Currently it uses `unsafe` due to borrow checking. Will be safe once stable Rust has
-    /// non-lexical lifetimes.
-    pub fn append(&mut self, other: Box<Self>) {
-        let mut cur = self as *mut Self;
-        while let &mut Some(ref mut next) = unsafe { &mut ((*cur).next) }  {
-            cur = next.as_mut();
-        }
-        unsafe {
-            (*cur).next = Some(other);
-        }
+        self.end_bit - self.start_bit
     }
 
     /// Reads a (potentially partial) byte.
@@ -205,6 +176,19 @@ impl PartialByte {
     }
 }
 
+fn bit_len_of_bit_slices(bs_list: &[BitSlice], cur_slice: usize, cur_bit: usize) -> usize {
+    let remaining_slice = &bs_list[cur_slice..];
+    if remaining_slice.is_empty() {
+        return 0;
+    }
+    let n_slice_bits_read = cur_bit - remaining_slice[0].start_bit;
+    remaining_slice
+        .iter()
+        .map(|bs| bs.bit_len() as usize)
+        .sum::<usize>()
+        - n_slice_bits_read
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,16 +196,12 @@ mod tests {
     #[test]
     fn smoke() {
         let data1: &[u8] = &[0b0001_1111, 0b1111_1111, 0b1111_1000];
-        let bs_all_ones = BStream::new(data1, 3, Some(18));
+        let bs_all_ones = BitSlice::new(data1, 3, Some(18));
 
-        let data2: Vec<u8> = vec![1, 0, 0, 0];
-        let bs_all_zeros = Box::new(BStream::new(data2, 8, None));
+        let data2: Vec<u8> = vec![0xFF, 0, 0, 0];
+        let bs_all_zeros = BitSlice::new(data2, 8, None);
 
-        let mut bs_ones_zeros = bs_all_ones;
-        bs_ones_zeros.append(bs_all_zeros);
-        assert_eq!(bs_ones_zeros.bit_len(), 18 + 8 * 3);
-
-        let mut bytes = ByteStream::new(&bs_ones_zeros);
+        let mut bytes = ByteStream::new(vec![bs_all_ones, bs_all_zeros]);
         assert_eq!(bytes.next(), Some(0xFF));
         assert_eq!(bytes.next(), Some(0xFF));
         let mut bits: BitStream = bytes.into(); // switches to bit stream
