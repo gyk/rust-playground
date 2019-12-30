@@ -111,20 +111,24 @@ mod tests {
     use super::*;
 
     quickcheck! {
-        fn prop_two_bytestreams(xs: Vec<u8>, start_bit: usize, bit_len1: usize, bit_len2: usize)
-            -> bool
+        fn prop_three_bytestreams(xs: Vec<u8>, start_bit: usize,
+            bit_len1: usize, bit_len2: usize, bit_len3: usize) -> bool
         {
-            if let None = BitSlice::get_end_bit(&xs, start_bit, Some(bit_len1 + bit_len2)) {
+            let bit_len = bit_len1 + bit_len2 + bit_len3;
+            if let None = BitSlice::get_end_bit(&xs, start_bit, Some(bit_len)) {
                 return true; // invalid input, ignored.
             }
 
-            let bs = BitSlice::new(&xs, start_bit, Some(bit_len1 + bit_len2));
-            assert_eq!(bs.bit_len(), bit_len1 + bit_len2);
+            let bs = BitSlice::new(&xs, start_bit, Some(bit_len));
+            if bs.bit_len() != bit_len {
+                return false;
+            }
             let all_bytes: Vec<u8> = ByteStream::new(vec![bs]).collect();
 
             let bs1 = BitSlice::new(&xs, start_bit, Some(bit_len1));
             let bs2 = BitSlice::new(&xs, start_bit + bit_len1, Some(bit_len2));
-            let concated_bytes: Vec<u8> = ByteStream::new(vec![bs1, bs2]).collect();
+            let bs3 = BitSlice::new(&xs, start_bit + bit_len1 + bit_len2, Some(bit_len3));
+            let concated_bytes: Vec<u8> = ByteStream::new(vec![bs1, bs2, bs3]).collect();
 
             all_bytes == concated_bytes
         }
