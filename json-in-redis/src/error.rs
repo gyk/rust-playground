@@ -1,37 +1,19 @@
 use std::net::AddrParseError;
 
-use redis_async::error::Error as RedisError;
-use serde_json::Error as JsonError;
-
-
-pub use failure::{format_err, Fail, Error as FailureError};
+use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    #[fail(display = "Internal error: {}", _0)]
+    #[error("Internal error: {0}")]
     InternalError(String),
 
-    #[fail(display = "{}", _0)]
-    AddrParseError(#[fail(cause)] AddrParseError),
+    #[error("{0}")]
+    AddrParseError(#[from] AddrParseError),
 
-    #[fail(display = "{}", _0)]
-    JsonError(#[fail(cause)] JsonError),
+    #[error("{0}")]
+    JsonError(#[from] serde_json::Error),
 
-    #[fail(display = "{}", _0)]
-    RedisError(#[fail(cause)] RedisError),
+    #[error("{0}")]
+    RedisError(#[from] redis_async::error::Error),
 }
-
-macro_rules! impl_from {
-    ($e:ident) => {
-        impl From<$e> for Error {
-            fn from(e: $e) -> Self {
-                Error::$e(e)
-            }
-        }
-    };
-}
-
-impl_from!(AddrParseError);
-impl_from!(JsonError);
-impl_from!(RedisError);
