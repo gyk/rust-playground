@@ -6,8 +6,7 @@ edition = "2018"
 
 [dependencies]
 failure = "0.1"
-futures-preview = { version = "0.3.0-alpha.14", features = ["compat"] }
-redis-async = "0.4"
+redis-async = "0.6"
 serde = "1.0"
 serde_json = "1.0"
-tokio = { git = "https://github.com/tokio-rs/tokio.git", branch = "master" }
+tokio = { version = "0.2", features = ["macros"] }

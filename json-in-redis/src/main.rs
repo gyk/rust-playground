@@ -1,13 +1,9 @@
 //! Stores JSON data into Redis
 
-// The experimental native async/await support
-#![feature(async_await)]
-
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use futures::compat::Future01CompatExt;
 use redis_async::client::{self, PairedConnection};
 use redis_async::resp_array;
 use serde_json::{self, json, Value};
@@ -20,25 +16,25 @@ async fn async_put_json<'a>(conn: &'a Arc<PairedConnection>, key: &'a str, value
     -> Result<()>
 {
     let value_str = value.to_string();
-    let _ret = conn.send::<String>(resp_array!["SET", key, value_str]).compat().await?;
+    let _ret = conn.send::<String>(resp_array!["SET", key, value_str]).await?;
     println!("async_put_json");
     Ok(())
 }
 
 async fn async_check_key<'a>(conn: &'a Arc<PairedConnection>, key: &'a str) -> Result<bool> {
-    let key_exist = conn.send(resp_array!["EXISTS", key]).compat().await?;
+    let key_exist = conn.send(resp_array!["EXISTS", key]).await?;
     println!("async_check_key");
     Ok(key_exist)
 }
 
 async fn async_fetch_json<'a>(conn: &'a Arc<PairedConnection>, key: &'a str) -> Result<Value> {
-    let ret: String = conn.send(resp_array!["GET", key]).compat().await?;
+    let ret: String = conn.send(resp_array!["GET", key]).await?;
     println!("async_fetch_json");
     Ok(serde_json::from_str(&ret)?)
 }
 
 async fn run_client(addr: SocketAddr) -> Result<()> {
-    let conn = Arc::new(client::paired_connect(&addr).compat().await?);
+    let conn = Arc::new(client::paired_connect(&addr).await?);
 
     let input_value = json!({
         "code": 200,
@@ -67,15 +63,14 @@ async fn run_client(addr: SocketAddr) -> Result<()> {
     Ok(())
 }
 
-fn main() -> error::Result<()> {
+#[tokio::main]
+async fn main() -> error::Result<()> {
     let addr = env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:6379".to_string())
         .parse()?;
 
-    tokio::run(async move {
-        run_client(addr).await.expect("run_client error")
-    });
+    run_client(addr).await.expect("run_client error");
 
     Ok(())
 }
