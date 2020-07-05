@@ -1,5 +1,8 @@
 # tokio-broadcast-bench
 
+The code can no longer run with Tokio 0.2. See [tokio02-broadcast-bench](../tokio02-broadcast-bench)
+for the updated version.
+
 ## Run Benchmark
 
 1. Run broadcasting server:
