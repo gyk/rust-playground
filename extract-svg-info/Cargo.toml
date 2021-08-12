@@ -1,0 +1,9 @@
+[package]
+name = "extract-svg-info"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0"
+svgtypes = "0.5.0"
+xml-rs = "0.8"
