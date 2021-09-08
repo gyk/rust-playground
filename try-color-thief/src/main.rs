@@ -1,6 +1,8 @@
+mod color_thief;
+
 use std::path::PathBuf;
 
-use color_thief::{self, ColorFormat};
+use crate::color_thief::ColorFormat;
 use image::{self, ColorType, GenericImageView};
 
 fn main() {
