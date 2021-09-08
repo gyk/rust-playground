@@ -33,6 +33,7 @@ const MAX_ITERATIONS: i32           = 1000;
 
 /// Represent a color format of an underlying image data.
 #[allow(missing_docs)]
+#[allow(dead_code)]
 #[derive(Clone,Copy,PartialEq,Debug)]
 pub enum ColorFormat {
     Rgb,
@@ -468,7 +469,7 @@ fn quantize(
 
     // next set - generate the median cuts using the (npix * vol) sorting.
     let len = pq.len() as u8;
-    iterate(&mut pq, compare_by_product, max_colors - len, &histogram)?;
+    iterate(&mut pq, compare_by_count, max_colors - len, &histogram)?;
 
     // Reverse to put the highest elements first into the color map.
     pq.reverse();
