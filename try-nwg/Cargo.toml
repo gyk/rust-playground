@@ -1,0 +1,10 @@
+[package]
+name = "try-nwg"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nwg = { package = "native-windows-gui", git = "https://github.com/gabdube/native-windows-gui", rev = "ddb9b6e9", features = ["list-view", "combobox", "image-list", "tray-notification", "message-window", "menu", "cursor"] }
+nwd = { version = "1.0.3", package = "native-windows-derive" }
