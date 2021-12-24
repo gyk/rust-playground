@@ -1,0 +1,17 @@
+[package]
+name = "nwg-flexbox-sub-layout"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nwd = { version = "1.0", package = "native-windows-derive" }
+
+[dependencies.nwg]
+package = "native-windows-gui"
+git = "https://github.com/gabdube/native-windows-gui"
+branch = "master"
+features = [
+    "list-view",
+]
