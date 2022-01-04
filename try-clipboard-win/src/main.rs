@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clipboard_win::{Clipboard, Getter};
 use clipboard_win::formats::*;
 
@@ -21,7 +23,7 @@ fn main() {
         Err(e) => println!("Read bitmap error {:?}", e),
     }
 
-    let mut file_list = Vec::new();
+    let mut file_list = Vec::<PathBuf>::new();
     match FileList.read_clipboard(&mut file_list) {
         Ok(len) => {
             println!("Read file list, len = {}, list = {:#?}", len, file_list);
