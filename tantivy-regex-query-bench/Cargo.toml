@@ -1,0 +1,10 @@
+[package]
+name = "tantivy-regex-query-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+fake = "2.4"
+rand = "0.8"
+tantivy = "0.16.1"
