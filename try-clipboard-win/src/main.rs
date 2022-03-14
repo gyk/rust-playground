@@ -18,7 +18,6 @@ fn main() {
     match Bitmap.read_clipboard(&mut image_buffer) {
         Ok(len) => {
             println!("Read bitmap, len = {}", len);
-            return;
         }
         Err(e) => println!("Read bitmap error {:?}", e),
     }
@@ -27,16 +26,17 @@ fn main() {
     match FileList.read_clipboard(&mut file_list) {
         Ok(len) => {
             println!("Read file list, len = {}, list = {:#?}", len, file_list);
-            return;
         }
         Err(e) => println!("Read file list error {:?}", e),
     }
 
     let mut s = String::new();
-    if let Ok(len) = Unicode.read_clipboard(&mut s) {
-        println!("Read string, len = {}, content = '{}'", len, s);
-        return;
+    match Unicode.read_clipboard(&mut s) {
+        Ok(len) => {
+            println!("Read string, len = {}, content = '{}'", len, s);
+        }
+        Err(e) => println!("Read unicode error {:?}", e),
     }
 
-    println!("Nothing in clipboard");
+    println!("End reading clipboard");
 }
