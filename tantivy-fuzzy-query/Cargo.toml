@@ -1,0 +1,12 @@
+[package]
+name = "tantivy-regex-query-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+fake = "2.4"
+itertools = "0.10.3"
+rand = "0.8"
+sublime_fuzzy = "0.7.0"
+tantivy = "0.16.1"
