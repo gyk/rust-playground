@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 
+use fake::faker::company::en::CompanyName;
 use fake::faker::name::en::Name;
 use fake::Fake;
 
@@ -10,7 +11,9 @@ use tantivy::collector::TopDocs;
 use tantivy::schema::{Schema, STORED, STRING};
 use tantivy::{doc, Index};
 
+mod disjoint;
 mod fuzzy_query;
+mod subseq;
 
 use crate::fuzzy_query::*;
 
@@ -27,12 +30,13 @@ fn main() -> Result<()> {
         Err(..) => {
             let index = Index::create_in_dir(path, schema)?;
 
-            let doc_count = 200;
+            let doc_count = 1_000_000;
 
             {
-                let mut index_writer = index.writer(3_000_000)?;
+                let mut index_writer = index.writer(5_000_000)?;
                 for _ in 0..doc_count {
-                    let doc: String = Name().fake();
+                    // let doc: String = format!("{}, {}", Name().fake::<String>(), CompanyName().fake::<String>());
+                    let doc: String = format!("{}", Name().fake::<String>());
 
                     index_writer.add_document(doc!(
                         title => doc,

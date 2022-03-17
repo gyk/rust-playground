@@ -10,3 +10,7 @@ itertools = "0.10.3"
 rand = "0.8"
 sublime_fuzzy = "0.7.0"
 tantivy = "0.16.1"
+tantivy-fst = "0.3.0"
+
+# [dependencies.tantivy]
+# path = "C:/Users/Dell/Documents/Code/RustPrj/tantivy"
