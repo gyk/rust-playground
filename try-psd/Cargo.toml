@@ -1,0 +1,9 @@
+[package]
+name = "try-psd"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+image = "0.24"
+psd = "0.3.0"
