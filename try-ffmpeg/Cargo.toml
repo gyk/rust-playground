@@ -1,0 +1,16 @@
+[package]
+name = "try-ffmpeg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+
+[dependencies.ffmpeg]
+package = "ffmpeg-next"
+version = "5.0.3"
+
+[dependencies.image]
+version = "0.24"
+default-features = false
+features = ["jpeg"]

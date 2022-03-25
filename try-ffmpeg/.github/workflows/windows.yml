@@ -1,0 +1,38 @@
+name: Check on Windows
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  check_windows:
+    name: "Check on Windows"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: "Install minimal stable"
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: "Install FFmpeg"
+        run: |
+          Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-5.0-full_build-shared.7z" -OutFile ffmpeg-shared.7z
+          mkdir "$HOME/ffmpeg-shared"
+          7z x ffmpeg-shared.7z -o "$HOME\ffmpeg-shared"
+          Add-Content $env:GITHUB_ENV "FFMPEG_DIR=$HOME\ffmpeg-shared`n"
+
+      - name: "Build"
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
