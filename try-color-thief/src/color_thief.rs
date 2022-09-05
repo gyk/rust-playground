@@ -84,7 +84,7 @@ pub fn get_palette(
     color_format: ColorFormat,
     quality: u8,
     max_colors: u8,
-) -> Result<Vec<Color>, Error> {
+) -> Result<Vec<(Color, u8)>, Error> {
     assert!(quality > 0 && quality <= 10);
     assert!(max_colors > 1);
 
@@ -451,7 +451,7 @@ fn quantize(
     color_format: ColorFormat,
     quality: u8,
     max_colors: u8,
-) -> Result<Vec<Color>, Error> {
+) -> Result<Vec<(Color, u8)>, Error> {
     // Get the histogram and the beginning vbox from the colors.
     let (vbox, histogram) = make_histogram_and_vbox(pixels, color_format, quality);
 
@@ -474,7 +474,14 @@ fn quantize(
     // Reverse to put the highest elements first into the color map.
     pq.reverse();
 
-    Ok(pq.iter().map(|v| v.average).collect())
+    let total = histogram.iter().sum::<i32>() as f64;
+    Ok(pq
+        .iter()
+        .map(|v| {
+            let weight = ((v.count * 256) as f64 / total).floor().clamp(0.0, 255.0);
+            (v.average, weight as u8)
+        })
+        .collect())
 }
 
 // Inner function to do the iteration.

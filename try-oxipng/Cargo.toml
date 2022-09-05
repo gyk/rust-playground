@@ -1,0 +1,18 @@
+[package]
+name = "try-oxipng"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+
+[dependencies.image]
+version = "0.24"
+default-features = false
+features = ["jpeg", "png"]
+
+[dependencies.oxipng]
+path = "../../oxipng"
+version = "6.0.1"
+default-features = false
+features = ["filetime", "parallel", "zopfli"]

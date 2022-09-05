@@ -1,0 +1,8 @@
+[package]
+name = "check-transparency"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gif = "0.11.3"
+png = "0.17.2"

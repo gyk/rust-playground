@@ -32,8 +32,8 @@ fn main() {
         println!("\n/* Scale = {}, size = {:?} */", scale, thumb.dimensions());
         let colors = color_thief::get_palette(thumb.as_bytes(), color_type, 10, 13).unwrap();
         println!("* {{");
-        for color in colors {
-            println!("  color: #{:02X}{:02X}{:02X};", color.r, color.g, color.b);
+        for (color, w) in colors {
+            println!("  color: #{:02X}{:02X}{:02X}; /* {:>5.2}% */", color.r, color.g, color.b, w as f64 * 100.0 / 256.0);
         }
         println!("}}");
     }
